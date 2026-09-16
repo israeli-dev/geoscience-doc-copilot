@@ -1,0 +1,21 @@
+# Virtual Environment
+venv/
+.venv/
+
+# Environment Variables / Secrets
+.env
+*.env
+
+# Python Cache & Build Files
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# System Files
+.DS_Store
+# Virtual Environment
+venv/
+.venv/
+__pycache__/
+.pytest_cache/
+
