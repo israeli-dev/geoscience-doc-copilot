@@ -1,141 +1,93 @@
-# PetroLens AI - Geoscience Doc Copilot
+@"
+# PetroLens AI - Reservoir Viability Engine
 
-> **Upload a petroleum geoscience report (PDF) → Get a commercial viability verdict in < 5 seconds.**
-> Blunt, investor-grade analysis: DEVELOP / APPRAISE / REJECT.
+> **Upload a petroleum geoscience report (PDF) → Get a commercial viability verdict in < 5 seconds.** Blunt, investor-grade analysis: DEVELOP / APPRAISE / REJECT.
 
-[Python](https://img.shields.io/badge/Python-3.14-blue)
-[FastAPI](https://img.shields.io/badge/FastAPI-Backend-green)
-[Streamlit](https://img.shields.io/badge/Streamlit-Frontend-red)
-[Gemini](https://img.shields.io/badge/Gemini-3_Flash_%2F_Pro-orange)
+![Python](https://img.shields.io/badge/Python-3.14-blue.svg)
+![FastAPI](https://img.shields.io/badge/FastAPI-8001-009688.svg)
+![Streamlit](https://img.shields.io/badge/Streamlit-8501-FF4B4B.svg)
+![Gemini](https://img.shields.io/badge/Gemini-3_Flash%2FPro-8E44AD.svg)
 
-Live Backend Docs: `http://127.0.0.1:8001/docs` (local) | Live Frontend: `http://localhost:8501`
+**Live Demo:** Backend `http://127.0.0.1:8001/docs` | Frontend `http://localhost:8501`
 
-### Why This Exists (The Problem)
+### Why This Exists
 
-Petroleum geologists waste 3-6 hours manually reading 40-80 page well reports, G&G evaluations, and play assessments to answer one question: **Is this drillable / commercial?**
+Petroleum geologists waste 3-6 hours manually reading 40-80 page well reports to answer: **Is this drillable / commercial?**
 
-Most AI PDF tools summarize. They don't *evaluate*. They don't tell you porosity is trash or seal is high-risk.
+Most AI PDF tools summarize. They don't *evaluate*.
 
-### What It Does (The Solution)
+**PetroLens is a domain-specific copilot that acts like a Senior Petroleum Geologist. It doesn't summarize - it scores.**
 
-PetroLens is a **domain-specific copilot** that acts like a Senior Petroleum Geologist. It doesn't summarize - it **scores commercial viability**.
+### Demo - Real Reports Tested
 
-Input: Any PDF (well completion report, reservoir evaluation, source rock study, seismic interpretation)
-Output:
-- **Commercial Viability Score: 0-100** with animated gauge
+#### Petroleum System: 72/100 APPRAISE
+![Petroleum 72 APPRAISE](frontend/screenshot.png)
+
+#### Civil Water Reservoir: 12/100 REJECT - Correctly filtered
+![Water 12 REJECT](frontend/screenshot_water_reject.PNG)
+
+| Report | Pages | Score | Verdict | Key Parsed |
+|--------|-------|-------|---------|------------|
+| **Petroleum Province** (Albian) | 39 | **72** | APPRAISE | 25% Porosity, 200mD, 10% TOC |
+| **Civil Water Reservoir** (Sites) | 133 | **12** | REJECT | <8% Porosity, <1mD, 0.8g PGA risk |
+
+**Validation:** Generic RAG would score both 70+. PetroLens correctly rejects non-petroleum.
+
+### What It Does
+- **Commercial Score 0-100** with gauge (Plotly)
 - **Verdict: DEVELOP / APPRAISE / REJECT**
-- **Breakdown:** Reservoir Quality (0-40), Source Rock (0-20), Trap/Seal (0-20), Commercial Risk (0-20)
-- **Parsed Parameters:** Porosity, Permeability, Net Pay, TOC, Ro%, Trap type, Seal
+- **Breakdown:** Reservoir (0-40), Source (0-20), Trap/Seal (0-20), Risk (0-20)
+- **Parsed:** Porosity, Permeability, Net Pay, TOC, Ro%, Trap Type
 - **Risk Factors & Executive Summary**
-- **AFC Flag:** Low/Med/High (Above Field Commerciality)
 
-### Demo
+### Architecture
+`PDF -> Streamlit (8501) -> FastAPI (8001) -> PyMuPDF (388k chars) -> Gemini 3 -> JSON -> Gauge`
 
-[Architecture](https://via.placeholder.com/800x400?text=Add+your+Streamlit+Screenshot+Here)
+### Key Features
+- Petroleum-only prompt (Niger Delta, Agbada/Akata, wrench fault blocks)
+- Dual Model: flash for speed, pro for depth
+- Strict JSON + regex fallback
+- Full-stack FastAPI + Streamlit
 
-**Flow:** User uploads PDF on Streamlit → FastAPI extracts text with PyMuPDF → Gemini 3 Flash (fast) or Pro (deep) parses with strict JSON schema → Streamlit renders gauge with Plotly.
-
-### Key Features for v1 (Petroleum-Specialized)
-
-- [x] **Petroleum-only System Prompt** - No generic summarizer. Understands Niger Delta, Agbada/Akata, rollover anticlines, 4-way closures.
-- [x] **Dual Model Strategy:** `gemini-3-flash-preview` for speed, `gemini-3.1-pro-preview` for deep evaluation
-- [x] **Strict JSON Enforcement** with fallback regex parsing (handles LLM markdown leaks)
-- [x] **Full-Stack:** FastAPI backend (`/api/upload-report`) + Streamlit frontend with `st.plotly_chart` gauge
-- [x] **Production-ready structure:** `app/services/`, `app/routers/`, `app/schemas/`, `frontend/`, `tests/`
-
-### Tech Stack
-
-**Backend:** FastAPI, Uvicorn, PyMuPDF (pdf extraction), Pydantic, python-multipart
-**AI:** Google GenAI SDK, Gemini 3 Flash / Pro, Dotenv for key management
-**Frontend:** Streamlit, Plotly (gauge chart), Requests
-**Dev:** Python 3.14, venv, pytest
-
-### Project Structure
-
-```
-geoscience-doc-copilot/
-├── main.py                     # FastAPI entry (at ROOT - important!)
-├── app/
-│   ├── __init__.py
-│   ├── config.py
-│   ├── services/
-│   │   └── llm_parser.py       # The brain - petroleum prompt + Gemini call
-│   ├── routers/
-│   │   └── upload.py           # /api/upload-report endpoint
-│   └── schemas/
-├── frontend/
-│   └── streamlit_app.py        # Gauge UI
-├── tests/
-├── .env                        # GEMINI_API_KEY=...
-├── requirements.txt
-└── README.md
-```
-
-### How to Run Locally (The Fix That Took 2 Hours)
-
-The gotcha: `main.py` MUST be at root, not inside `app/`. And import must be `from app.services.llm_parser import ...` not `from app.llm_parser import ...`.
-
-**1. Clone & Setup**
-```powershell
-git clone https://github.com/<israeli-dev>/geoscience-doc-copilot.git
+### How to Run Locally
+``````bash
+git clone https://github.com/israeli-dev/geoscience-doc-copilot.git
 cd geoscience-doc-copilot
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-```
-
-**2. Env**
-Create `.env`:
-```
-GEMINI_API_KEY=your_key_here
-```
-
-**3. Run Backend (Terminal 1) - Use 0.0.0.0 and 8001 to avoid Windows firewall/reload bug**
-```powershell
+# .env with GEMINI_API_KEY
 python -m uvicorn main:app --host 0.0.0.0 --port 8001
-# Docs: http://127.0.0.1:8001/docs
-```
-
-**4. Run Frontend (Terminal 2)**
-```powershell
-.\venv\Scripts\Activate.ps1
-# Ensure frontend/streamlit_app.py has: BACKEND_URL = "http://127.0.0.1:8001/api/upload-report"
+# Terminal 2
 streamlit run frontend/streamlit_app.py --server.port 8501
-# App: http://localhost:8501
-```
 
-### Example API Response
 
-```json
+
+##Example Response
+
 {
-  "model": "gemini-3-flash-preview",
-  "analysis": {
-    "commercial_viability_score": 73,
-    "commercial_verdict": "APPRAISE",
-    "viability_breakdown": {
-      "reservoir_quality": 32,
-      "source_rock": 15,
-      "trap_seal": 16,
-      "commercial_risk": 10
-    },
-    "reservoir_quality": {"porosity": "22%", "permeability": "150mD", "net_pay": "15m"},
-    "risk_factors": ["High water cut risk", "Fault seal uncertainty"],
-    "executive_summary": "Good reservoir, moderate source maturity. Needs appraisal well to de-risk trap.",
-    "AFC_flag": "Med"
-  }
+  "commercial_viability_score": 72,
+  "commercial_verdict": "APPRAISE",
+  "viability_breakdown": {"reservoir_quality": 30, "source_rock": 18, "trap_seal": 14, "commercial_risk": 10},
+  "executive_summary": "Proven but under-explored petroleum system with Espoir field analog. Billion-barrel potential."
 }
-```
 
-### Roadmap
 
-**v1 (Current): Petroleum Specialist** - DELIBERATELY NICHE for portfolio positioning. Proves domain expertise.
-**v2:** Add groundwater / water resources mode (separate prompt + toggle in UI)
-**v3:** Deploy: Backend to Render, Frontend to Streamlit Cloud, add auth + report history DB
-**v4:** Add map view for trap location, cross-section Q&A
+Why Petroleum-Specialized?
+Generic RAG = commodity. Specialist = hireable.
+Tested 72 vs 12 proves prompt engineering, not summarization.
 
-### Why Petroleum Specialized (Design Decision)
+Roadmap
+v1: Petroleum Specialist (current)
+v2: Water resources toggle
+v3: Deploy to Render + Streamlit Cloud
+v4: Map view
+Lessons Learned
+main.py at root fixes ModuleNotFoundError
+Use 0.0.0.0:8001 on Windows
+Gemini leaks markdown - need regex fallback
+venv/ in .gitignore from day one
 
-I tested with a water resources report and it worked, but I chose to keep v1(first-version) petroleum-specific/tuned. Generic RAG = commodity, while specialised application = tool. This version is equiped with a cool feature like petroleum **viability scorer**, a big deal and a time saver for industry folks, valuable tool for Subsurface, and Oil & Gas analytics. 
 
----
-Built by Kolawole, Israel Iyanu | Geoscientist turned AI Engineer.
+Built by Kolawole, Israel Iyanu | Geoscientist turned AI Engineer | Lagos, NG
+"@ | Set-Content -Path README.md -Encoding utf8
