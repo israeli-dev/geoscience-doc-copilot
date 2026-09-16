@@ -1,7 +1,6 @@
-@"
-# PetroLens AI - Reservoir Viability Engine
+﻿# PetroLens AI - Reservoir Viability Engine
 
-> **Upload a petroleum geoscience report (PDF) → Get a commercial viability verdict in < 5 seconds.** Blunt, investor-grade analysis: DEVELOP / APPRAISE / REJECT.
+> **Upload a petroleum geoscience report (PDF) â†’ Get a commercial viability verdict in < 5 seconds.** Blunt, investor-grade analysis: DEVELOP / APPRAISE / REJECT.
 
 ![Python](https://img.shields.io/badge/Python-3.14-blue.svg)
 ![FastAPI](https://img.shields.io/badge/FastAPI-8001-009688.svg)
@@ -21,10 +20,10 @@ Most AI PDF tools summarize. They don't *evaluate*.
 ### Demo - Real Reports Tested
 
 #### Petroleum System: 72/100 APPRAISE
-![Petroleum 72 APPRAISE](frontend/screenshot.png)
+!![Petroleum 72 APPRAISE](frontend/screenshot.png)
 
 #### Civil Water Reservoir: 12/100 REJECT - Correctly filtered
-![Water 12 REJECT](frontend/screenshot_water_reject.PNG)
+!![Water 12 REJECT](frontend/screenshot_water_reject.PNG)
 
 | Report | Pages | Score | Verdict | Key Parsed |
 |--------|-------|-------|---------|------------|
@@ -90,4 +89,3 @@ venv/ in .gitignore from day one
 
 
 Built by Kolawole, Israel Iyanu | Geoscientist turned AI Engineer | Lagos, NG
-"@ | Set-Content -Path README.md -Encoding utf8
