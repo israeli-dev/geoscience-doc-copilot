@@ -1,28 +1,25 @@
-fastapi>=0.110.0
-uvicorn[standard]>=0.28.0
-pydantic>=2.6.0
-python-dotenv>=1.0.0
-google-genai
-pytest>=8.0.0
-httpx>=0.27.0
-
-
-# fastapi
-# uvicorn
-streamlit
-PyMuPDF
-# python-dotenv
-# google-genai
-requests
-plotly
-
-
+# PetroLens Executive v3.1 - Final Deploy Requirements
+# Core API
 fastapi
-uvicorn
+uvicorn[standard]
 python-multipart
-pymupdf
+pydantic
 python-dotenv
+
+# AI
 google-genai
+
+# PDF / DOCX Extraction 
+pymupdf
+python-docx
+
+# Frontend & Reports
 streamlit
 plotly
 requests
+reportlab
+
+# Testing (optional)
+pytest==8.3.2
+httpx==0.27.2
+
