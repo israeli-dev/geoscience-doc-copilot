@@ -77,7 +77,7 @@ def create_executive_pdf(analysis, filename, posg_data, model_used):
 
 with st.sidebar:
     st.markdown("### PetroLens Executive v2.6")
-    api_url = st.text_input("API URL", "http://127.0.0.1:8001/api/upload-report")
+    api_url = st.text_input("API URL", "https://geoscience-doc-copilot.onrender.com/api/upload-report")
 
 st.title("PetroLens AI - Subsurface Intelligence")
 st.caption("Gauge Style | Histogram Bar (0-100 Capped) | POSg Multiplicative | Gemini 3")
