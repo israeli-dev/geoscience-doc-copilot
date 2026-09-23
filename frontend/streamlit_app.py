@@ -129,7 +129,7 @@ with st.sidebar:
 
 # ----------------- MAIN -----------------
 st.title("PetroLens AI - Subsurface Intelligence (v3.1)")
-st.caption("Gauge + Bars (0-100 Capped) | POSg Multiplicative | Real Output")
+st.caption("Upload a Petroleum Geoscience Report and get a deep & insightful scored on Commercial viability guage| POSg Multiplicative | Real Output")
 
 uploaded_file = st.file_uploader("Upload Geoscience Report (PDF/DOCX/TXT/MD)", type=["pdf","docx","txt","md"])
 deep = st.checkbox("Deep Analysis (gemini-3.1-pro-preview)", value=False, help="Use Pro model only when you need a deep analysis--for real business decision (Pro model does't run on a free API). Else, keep UNCHECKED for real free-tier results.")
@@ -193,7 +193,7 @@ if uploaded_file and st.button("Generate Executive Analysis", type="primary", us
 
             # For other HTTP errors, show real error
             if resp.status_code >= 400:
-                st.error(f"❌ **Backend returned {resp.status_code} (real error, no mock)**")
+                st.error(f"❌ **Backend returned {resp.status_code} (real error)**")
                 try:
                     st.json(resp.json())
                 except:
