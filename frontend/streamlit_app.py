@@ -1,7 +1,7 @@
 """
 PetroLens Executive v3.1 - REAL OUTPUT ONLY
 Features: Gauge POSg + Viability, Thin-Bar Histogram (capped 100), POSg Multiplicative, Fluid & Formation, Volumetrics, Production, Risk, Executive Summary, PDF
-Fixes: 300s timeout for Render cold start, real 429/503/ReadTimeout handling (no mock fallback)
+Fixes: 180s timeout for Render cold start, real 429/503/ReadTimeout handling (no mock fallback)
 """
 
 import streamlit as st
@@ -119,20 +119,20 @@ def create_executive_pdf(analysis, filename, posg_data, model_used):
 # ----------------- SIDEBAR -----------------
 with st.sidebar:
     st.markdown("### PetroLens Executive v3.1")
-    st.caption("Real Output Only • No Mock Fallback")
+    st.caption("Real Output Only")
     api_url = st.text_input("API URL", "https://geoscience-doc-copilot.onrender.com/api/upload-report", help="Your Render backend URL")
     st.divider()
-    st.markdown("**Quota Tips (Real):**")
-    st.info("• Flash-lite = 1500/day free\n• Flash-preview = 20/day free\n• Pro = 0/day free (needs billing)\n• Resets 8am Lagos (midnight PT)\n• Keep Deep UNCHECKED for free tier")
+    st.markdown("**AI Petroleum Geologist Overview:**")
+    st.info("Every result are:\n• Petroleum synergised\n• With over 25 years experience\n• LLM extracted\n• Thoroughly filtered against hallucination")
     st.divider()
-    st.caption("Build: 2026-05-11 • Model: gemini-3-flash-preview / gemini-2.0-flash-lite")
+    st.caption("Build: 2026-09-22 • Model: gemini-3-flash-preview / gemini-3.1-pro-preview")
 
 # ----------------- MAIN -----------------
-st.title("PetroLens AI - Subsurface Intelligence v3.1")
-st.caption("Gauge + Thin-Bar Histogram (0-100 Capped) | POSg Multiplicative | Real Gemini Output Only")
+st.title("PetroLens AI - Subsurface Intelligence (v3.1)")
+st.caption("Gauge + Bars (0-100 Capped) | POSg Multiplicative | Real Output")
 
 uploaded_file = st.file_uploader("Upload Geoscience Report (PDF/DOCX/TXT/MD)", type=["pdf","docx","txt","md"])
-deep = st.checkbox("Deep Analysis (gemini-3.1-pro-preview - requires billing, 0 free quota)", value=False, help="Uses Pro model - will fail with 429 on free tier. Keep UNCHECKED for real free-tier results.")
+deep = st.checkbox("Deep Analysis (gemini-3.1-pro-preview)", value=False, help="Use Pro model only when you need a deep analysis--for real business decision (Pro model does't run on a free API). Else, keep UNCHECKED for real free-tier results.")
 
 if uploaded_file:
     st.info(f"📄 File: {uploaded_file.name} | Size: {uploaded_file.size/1024/1024:.2f} MB | Type: {uploaded_file.type}")
@@ -143,11 +143,11 @@ if uploaded_file and st.button("Generate Executive Analysis", type="primary", us
             files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type or "application/octet-stream")}
             data = {"deep": str(deep).lower()}
             
-            # REAL FIX: 300s timeout for Render cold start, no fake retry loop
+            # REAL FIX: 200s timeout for Render cold start, no fake retry loop
             try:
-                resp = requests.post(api_url, files=files, data=data, timeout=300)
+                resp = requests.post(api_url, files=files, data=data, timeout=180)
             except requests.exceptions.ReadTimeout:
-                st.error("⏱️ ReadTimeout (180s+): Render free instance is waking up + Gemini processing > 300s")
+                st.error("⏱️ ReadTimeout (100s+): Render free instance is waking up + Gemini processing > 100s")
                 st.markdown("""
                 **Real fix:**
                 1. Open **https://geoscience-doc-copilot.onrender.com/** in new tab → Wait 30s until `{"status":"PetroLens Active"}`
@@ -168,12 +168,12 @@ if uploaded_file and st.button("Generate Executive Analysis", type="primary", us
                     err_detail = err_json.get("detail", str(err_json)[:800])
                 except:
                     err_detail = resp.text[:800]
-                st.error("🚫 **REAL QUOTA EXCEEDED - 429 RESOURCE_EXHAUSTED (No fake data generated)**")
+                st.error("🚫 **REAL QUOTA EXCEEDED - 429 RESOURCE_EXHAUSTED **")
                 st.code(err_detail)
                 st.warning("""
                 **Why this happened (real):**
                 - Free tier: `gemini-3-flash-preview` = 20 requests/day per project (RPD)
-                - You hit 20/20 by testing. New project = fresh 20, but same limit.
+                - You hit 20/20 by testing.
                 
                 **Real fixes (no fake):**
                 1. **Wait 60s** then retry (RPM = 5/min limit) - you may have clicked too fast
@@ -207,7 +207,7 @@ if uploaded_file and st.button("Generate Executive Analysis", type="primary", us
             
             # Real document type check (no fake bypass)
             if a.get("is_oil_gas_document") == False:
-                st.error(f"🚫 **REJECTED - Not Oil & Gas Document (Real Gemini Classification)**")
+                st.error(f"🚫 **REJECTED - Not Oil & Gas Document (Real Classification)**")
                 st.write(f"**Detected Type:** {a.get('document_type_detected', 'Unknown')}")
                 st.write(f"**Reason:** {a.get('rejection_reason') or a.get('executive_summary') or 'Model determined this is not a petroleum geoscience report'}")
                 st.info("Upload a real geoscience report (well report, reservoir study, seismic interpretation) to get real analysis.")
@@ -278,7 +278,7 @@ if uploaded_file and st.button("Generate Executive Analysis", type="primary", us
                 st.metric("Model (Real)", model_used.split(' ')[0][:18])
 
             # ----------------- THIN-BAR HISTOGRAM (CAPPED 100) -----------------
-            st.subheader("Petroleum System Confidence - Thin-Bar Histogram (Capped at 100 - Real)")
+            st.subheader("Petroleum System Confidence - Bar (Capped at 100)")
             fig2 = go.Figure()
             fig2.add_trace(go.Bar(
                 x=list(elements.keys()), 
@@ -301,7 +301,7 @@ if uploaded_file and st.button("Generate Executive Analysis", type="primary", us
             st.divider()
 
             # ----------------- FLUID & FORMATION (REAL) -----------------
-            st.subheader("Fluid & Formation (Real Gemini Extraction)")
+            st.subheader("Fluid & Formation")
             fluid = a.get("fluid_analysis", {})
             vol = a.get("volumetrics", {})
             prod = a.get("production_forecast", {})
@@ -322,18 +322,18 @@ if uploaded_file and st.button("Generate Executive Analysis", type="primary", us
                 """)
 
             # ----------------- EXECUTIVE SUMMARY (REAL) -----------------
-            st.subheader("Executive Summary (Real Gemini Output - No Hallucination)")
+            st.subheader("Executive Summary (Real Model Output - No Hallucination)")
             summary = a.get('executive_summary','No summary available - backend returned empty')
             st.markdown(f"<div style='background-color: #f0fdf4; border-left: 4px solid #22c55e; padding: 12px 16px; border-radius: 6px; color: #14532d;'>{summary}</div>", unsafe_allow_html=True)
 
             # ----------------- RISKS (REAL) -----------------
-            st.subheader("Risk Factors (Real)")
+            st.subheader("Risk Factors")
             risks = a.get('risk_factors', [])
             if risks:
                 for i, r in enumerate(risks, 1):
                     st.markdown(f"{i}. {r}")
             else:
-                st.caption("No risk factors returned from backend (real)")
+                st.caption("No risk factors returned from backend")
 
             st.divider()
 

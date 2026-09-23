@@ -1,6 +1,6 @@
 """
 PetroLens FIXED for Sep 2026 Gemini API keys
-- Only models allowed: gemini-3-flash-preview (FREE quota) and gemini-3.1-pro-preview (quota 0 on free)
+- Only models allowed: gemini-3-flash-preview (FREE quota) and gemini-3.1-pro-preview (which is 0 quota on free tier)
 - Fix: Use Flash as PRIMARY, Pro as fallback only when Deep=True
 - Fix: Return 429 JSON not 500, so Streamlit shows retry message
 - Fix: Proper DOCX support
@@ -21,7 +21,7 @@ MODEL_FAST = "gemini-3-flash-preview"
 MODEL_DEEP = "gemini-3.1-pro-preview"
 
 EXECUTIVE_PROMPT = """
-You are a Senior Petroleum Geologist with 25 years Niger Delta deepwater experience, reporting to VP Exploration. You are also a strict Document Classifier.
+You are a Senior Petroleum Geologist with 25 years Niger Delta deepwater experience (if the field is not in Niger Delta, then assume a senior petroleum geologist role in that field or basin), reporting to VP Exploration. You are also a strict Document Classifier.
 
 TASK: Step 1 - CLASSIFY, Step 2 - EVALUATE ONLY IF OIL & GAS.
 
@@ -166,7 +166,7 @@ async def upload_report(file: UploadFile = File(...), deep: str = Form("false"))
     text = extract_text(file_bytes, file.filename or "report.pdf")
     prompt = EXECUTIVE_PROMPT.replace("{report_text}", text)
 
-    # SEP 2025 FIX: Flash is primary (has free quota), Pro has quota 0
+    # SEP 2026 FIX: Flash is primary (has free quota), Pro needs payment: has 0 quota on free tier
     # If deep=True, try Pro first then Flash fallback
     # If deep=False, use Flash only (avoid Pro 429)
     is_deep = deep.lower() == "true"
@@ -217,7 +217,7 @@ async def upload_report(file: UploadFile = File(...), deep: str = Form("false"))
         return JSONResponse(
             status_code=429,
             content={
-                "detail": f"Gemini quota exceeded (Sep 2025 free tier limit 0 for Pro). Last: {str(last_error)[:500]}. Please wait 1 min and uncheck Deep Analysis checkbox, or add billing at https://ai.google.dev/gemini-api/docs/billing. Tip: Use Flash model (Deep unchecked) which has free quota.",
+                "detail": f"Gemini quota exceeded (Sep 2026 free tier limit 0 for Pro). Last: {str(last_error)[:500]}. Please wait 1 min and uncheck Deep Analysis checkbox, or add billing at https://ai.google.dev/gemini-api/docs/billing. Tip: Use Flash model (Deep unchecked) which has free quota.",
                 "is_quota_error": True
             }
         )
