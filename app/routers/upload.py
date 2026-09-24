@@ -1,24 +1,28 @@
 """
-PetroLens FIXED for Sep 2026 Gemini API keys
-- Only models allowed: gemini-3-flash-preview (FREE quota) and gemini-3.1-pro-preview (which is 0 quota on free tier)
-- Fix: Use Flash as PRIMARY, Pro as fallback only when Deep=True
-- Fix: Return 429 JSON not 500, so Streamlit shows retry message
-- Fix: Proper DOCX support
+PetroLens v3.4 ACCURACY + QUOTA-ECONOMICS
+- Accuracy: Keep 150k chars, 8192 max_output_tokens (no reduction)
+- Deep = gemini-3.1-pro-preview ONLY (no fallback to Flash)
+- Normal = gemini-3-flash-preview ONLY (no fallback to Pro)
+- Retry loop: max 2 times only (not infinite)
+- UI same: {analysis, filename, model_used}
 """
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 import fitz
-import os, re, json, time, traceback
+import os, re, json, time
 from dotenv import load_dotenv
+from fastapi.responses import JSONResponse
 
 load_dotenv()
 router = APIRouter()
 
 from google import genai
+from google.genai import types
+
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
-MODEL_FAST = "gemini-3-flash-preview"
-MODEL_DEEP = "gemini-3.1-pro-preview"
+MODEL_FAST = "gemini-3-flash-preview"   # Normal analysis ONLY
+MODEL_DEEP = "gemini-3.1-pro-preview"   # Deep analysis ONLY - no fallback
 
 EXECUTIVE_PROMPT = """
 You are a Senior Petroleum Geologist with 25 years Niger Delta deepwater experience (if the field is not in Niger Delta, then assume a senior petroleum geologist role in that field or basin), reporting to VP Exploration. You are also a strict Document Classifier.
@@ -85,13 +89,17 @@ def extract_text(file_bytes, filename):
                     text += cell.text + " "
                 text += "\n"
     elif fname.endswith(".doc"):
-        raise HTTPException(400, "Old .DOC format (binary). Please save as .DOCX or PDF and re-upload.")
+        raise HTTPException(status_code=400, detail="Old .DOC format (binary). Please save as .DOCX or PDF and re-upload.")
     else:
         text = file_bytes.decode("utf-8", errors="ignore")
+    
     if len(text.strip()) < 20:
-        raise HTTPException(400, f"Text too short ({len(text)} chars). Scanned image PDF?")
+        raise HTTPException(status_code=400, detail=f"Text too short ({len(text)} chars). Scanned image PDF?")
+    
+    # ACCURACY: Keep 150k as you requested
     if len(text) > 150000:
         text = text[:150000] + "\n...[truncated]"
+    
     return text
 
 def parse_gemini_json(raw_text):
@@ -138,97 +146,127 @@ def ensure_industry_standard(data):
     data["commercial_viability_score"] = min(100, max(0, int(data.get("commercial_viability_score", 50))))
     return data
 
-def try_chat_api(mname, prmpt):
-    from google.genai import types
-    config = types.GenerateContentConfig(
-        temperature=0.1,
-        max_output_tokens=8192,
-        top_p=0.9,
-    )
-    try:
-        chat = client.chats.create(model=mname, config=config)
-        resp = chat.send_message(prmpt)
-        return resp.text
-    except Exception as e:
-        # Fallback to models.generate_content
-        try:
-            resp = client.models.generate_content(model=mname, contents=prmpt, config=config)
-            return resp.text
-        except Exception as e2:
-            raise e2
-
 @router.post("/upload-report")
 async def upload_report(file: UploadFile = File(...), deep: str = Form("false")):
     if not GEMINI_API_KEY:
-        raise HTTPException(500, "GEMINI_API_KEY not set")
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not set")
 
     file_bytes = await file.read()
     text = extract_text(file_bytes, file.filename or "report.pdf")
     prompt = EXECUTIVE_PROMPT.replace("{report_text}", text)
 
-    # SEP 2026 FIX: Flash is primary (has free quota), Pro needs payment: has 0 quota on free tier
-    # If deep=True, try Pro first then Flash fallback
-    # If deep=False, use Flash only (avoid Pro 429)
+    # DIFFERENT MODEL FOR DEEP vs NORMAL - NO FALLBACK (as you requested)
     is_deep = deep.lower() == "true"
-    models_to_try = [MODEL_DEEP, MODEL_FAST] if is_deep else [MODEL_FAST]
+    mname = MODEL_DEEP if is_deep else MODEL_FAST
 
-    raw = ""
+    print(f"[ACCURACY] Model={mname} Deep={is_deep} File={file.filename} Chars={len(text)} Tokens~{len(text)//4}")
+
+    # Retry loop max 2 times only
+    max_retries = 2
     last_error = None
-    model_used_final = MODEL_FAST
-
-    for mname in models_to_try:
+    
+    for attempt in range(1, max_retries + 1):
         try:
-            print(f"[TRY] {mname} for file {file.filename} deep={is_deep}")
-            raw = try_chat_api(mname, prompt)
-            model_used_final = mname
-            print(f"[SUCCESS] {mname} returned {len(raw)} chars")
-            break
+            print(f"[TRY {attempt}/{max_retries}] {mname} -> {file.filename}")
+            
+            resp = client.models.generate_content(
+                model=mname,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    temperature=0.1,
+                    max_output_tokens=8192,  # Keep 8192 as you requested for accuracy
+                    top_p=0.9,
+                )
+            )
+            raw = resp.text
+            print(f"[SUCCESS] {mname} attempt {attempt} returned {len(raw)} chars")
+            break  # Success - exit retry loop
+            
         except Exception as e:
             last_error = e
-            print(f"[FAIL] {mname} -> {e}")
-            print(traceback.format_exc())
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e) or "quota" in str(e).lower():
-                # If Pro failed with 429 and we have Flash fallback, try next model
-                if mname == MODEL_DEEP and MODEL_FAST in models_to_try or mname == MODEL_DEEP:
-                    # If deep was true, now try flash as fallback
-                    if MODEL_FAST not in models_to_try:
-                        models_to_try.append(MODEL_FAST)
-                    print(f"[WARN] Pro {MODEL_DEEP} quota 0, falling back to {MODEL_FAST}")
+            err_str = str(e)
+            print(f"[FAIL {attempt}/{max_retries}] {mname} -> {err_str[:400]}")
+            
+            is_quota = "429" in err_str or "RESOURCE_EXHAUSTED" in err_str or "quota" in err_str.lower()
+            is_overload = "503" in err_str or "overloaded" in err_str.lower()
+            
+            # If last attempt, break and return error below
+            if attempt == max_retries:
+                print(f"[FINAL FAIL] {mname} after {max_retries} attempts")
+                break
+            
+            # Retry logic: wait then retry same model (no fallback)
+            if is_overload:
+                wait = 5 * attempt  # 5s, 10s
+                print(f"[RETRY] Overloaded, waiting {wait}s before retry {attempt+1}")
+                time.sleep(wait)
+                continue
+            elif is_quota:
+                if mname == MODEL_DEEP:
+                    # Pro has 0 free quota - don't retry, return 429 immediately (no fallback)
+                    print(f"[QUOTA] Pro model has 0 free quota - no retry with Flash (as requested)")
+                    return JSONResponse(
+                        status_code=429,
+                        content={
+                            "detail": f"🚫 Deep Analysis (Pro) has 0 free quota on free tier. Uncheck 'Deep Analysis' to use {MODEL_FAST} (20/day free) or add billing at https://ai.google.dev/gemini-api/docs/billing. Pro will work after billing.",
+                            "is_quota_error": True
+                        }
+                    )
+                else:
+                    # Flash quota - retry once after 10s
+                    wait = 10
+                    print(f"[QUOTA] Flash quota hit, waiting {wait}s before retry {attempt+1}/{max_retries}")
+                    time.sleep(wait)
                     continue
-                # If Flash also 429, wait and retry once
-                if mname == MODEL_FAST:
-                    print("[QUOTA] Flash also hit 429, sleeping 10s then retry once")
-                    time.sleep(10)
-                    try:
-                        raw = try_chat_api(mname, prompt)
-                        model_used_final = mname
-                        break
-                    except Exception as e2:
-                        last_error = e2
-                        continue
-            # For other errors, try next model
-            continue
+            else:
+                # Other error - retry once
+                wait = 3
+                print(f"[RETRY] Unknown error, waiting {wait}s")
+                time.sleep(wait)
+                continue
+    else:
+        # This else runs if loop didn't break (should not happen due to break above)
+        raw = ""
 
-    if not raw:
-        # Both failed - return mock data to avoid 500, but log error
-        print(f"[CRITICAL] Both models failed. Last error: {last_error}")
-        # Return 429 JSON so frontend shows friendly message
-        from fastapi.responses import JSONResponse
+    # If we exited loop without raw (both retries failed)
+    if 'raw' not in locals() or not raw:
+        print(f"[CRITICAL] {mname} failed after {max_retries} attempts. Last: {last_error}")
+        
+        if last_error and ("429" in str(last_error) or "quota" in str(last_error).lower()):
+            if mname == MODEL_DEEP:
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "detail": f"🚫 Deep Analysis quota exceeded. Pro model ({MODEL_DEEP}) has 0 free quota. Uncheck 'Deep Analysis' for Flash (20/day free). Add billing for 50/day Pro: https://ai.google.dev/gemini-api/docs/billing",
+                        "is_quota_error": True
+                    }
+                )
+            else:
+                return JSONResponse(
+                    status_code=429,
+                    content={
+                        "detail": f"🚫 Daily quota exceeded (20/day on {MODEL_FAST}). Retried {max_retries} times. Wait 60s or try tomorrow 8am Lagos. Check: https://ai.dev/rate-limit",
+                        "is_quota_error": True
+                    }
+                )
+        
         return JSONResponse(
-            status_code=429,
+            status_code=500,
             content={
-                "detail": f"Gemini quota exceeded (Sep 2026 free tier limit 0 for Pro). Last: {str(last_error)[:500]}. Please wait 1 min and uncheck Deep Analysis checkbox, or add billing at https://ai.google.dev/gemini-api/docs/billing. Tip: Use Flash model (Deep unchecked) which has free quota.",
-                "is_quota_error": True
+                "detail": f"AI service failed after {max_retries} retries: {str(last_error)[:500]}",
+                "is_quota_error": False
             }
         )
 
     if not raw or len(raw.strip()) < 10:
-        raise HTTPException(500, f"Gemini empty response for {model_used_final}")
+        raise HTTPException(status_code=500, detail=f"Gemini empty response for {mname}")
 
     try:
         analysis = parse_gemini_json(raw)
     except Exception as e:
-        raise HTTPException(500, f"JSON parse failed: {e} | Raw: {raw[:2000]}")
+        raise HTTPException(status_code=500, detail=f"JSON parse failed: {e} | Raw: {raw[:2000]}")
 
     analysis = ensure_industry_standard(analysis)
-    return {"analysis": analysis, "filename": file.filename, "model_used": model_used_final}
+    
+    # UI same as before
+    return {"analysis": analysis, "filename": file.filename, "model_used": mname}
