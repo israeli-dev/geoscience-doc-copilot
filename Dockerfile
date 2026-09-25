@@ -1,12 +1,11 @@
-# PetroLens Executive v3.1 - Backend API + Frontend Ready
+# Use Python 3.11 slim - Render + Cloud Run compatible
 FROM python:3.11-slim
 
 WORKDIR /app
 
-# System deps for PyMuPDF + python-docx
-RUN apt-get update && apt-get install -y \
+# Install system deps for PyMuPDF
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
-    libmupdf-dev \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -14,7 +13,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Expose both FastAPI and Streamlit
-EXPOSE 8000 8501
+# Render and Cloud Run both use PORT env (Render 10000, Cloud Run 8080)
+ENV PORT=8080
+EXPOSE 8080
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# FIX: Use root main.py (main:app) - works for both Render and Cloud Run
+# Your old Dockerfile used app.main:app but app/main.py doesn't exist - caused "Exited with status 1"
+CMD uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}
