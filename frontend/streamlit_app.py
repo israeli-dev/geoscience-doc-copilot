@@ -1,8 +1,5 @@
 """
-PetroLens Executive v3.5 Production - Mature
-- Single barrel icon
-- Native Streamlit theme via ⋮ > Settings > Theme
-- No custom cartoon toggle, no explanatory labels
+PetroLens Executive v3.5 Production
 """
 import streamlit as st
 import requests
@@ -101,17 +98,18 @@ def create_executive_pdf(analysis, filename, posg_data, model_used):
     buffer.seek(0)
     return buffer
 
-# SIDEBAR - mature, no custom theme toggle
+# Sidebar
 with st.sidebar:
     st.markdown("### PetroLens Executive v3.5")
     st.caption("Production - Subsurface Intelligence")
+    st.divider()
+    mode = st.selectbox("Analysis Mode", ["Standard", "Deep Analysis"], index=0)
+    st.caption("Standard: Gemini 3 Flash • Deep: Gemini 3 Pro")
     st.divider()
     st.markdown("**Petroleum System**")
     st.caption("Source • Reservoir • Trap • Seal • Charge")
     st.markdown("**POSg**")
     st.caption("Multiplicative (Rose 1987)")
-    st.divider()
-    st.caption("Theme: ⋮ → Settings → Theme")
 
 st.title("PetroLens - Subsurface Intelligence")
 st.caption("v3.5 Production | Commercial Viability Gauge | POSg Multiplicative")
@@ -122,38 +120,74 @@ if uploaded_file is None:
     st.info("Upload a petroleum geoscience report to analyze commercial viability.")
     st.stop()
 
-with st.spinner("Waking up backend..."):
-    try:
-        requests.get("https://geoscience-doc-copilot.onrender.com/", timeout=10)
-    except:
-        pass
+# Map mode to backend model parameter
+model_param = "pro" if mode == "Deep Analysis" else "flash"
 
-with st.spinner("Analyzing report..."):
-    try:
-        files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-        data = {"model": "flash"}
-        resp = requests.post(API_URL, files=files, data=data, timeout=120)
-    except requests.exceptions.ReadTimeout:
-        st.error("Backend waking up — Render free tier needs 50s. Please wait and retry.")
-        st.stop()
-    except Exception as e:
-        st.error(f"Connection error: {e}")
-        st.stop()
+# Prevent auto re-trigger loop: only analyze when file changes or mode changes or explicit button
+if "last_file_name" not in st.session_state:
+    st.session_state.last_file_name = ""
+if "last_mode" not in st.session_state:
+    st.session_state.last_mode = ""
+if "analysis_result" not in st.session_state:
+    st.session_state.analysis_result = None
 
-if resp.status_code != 200:
-    try:
-        err = resp.json()
-        msg = err.get("detail", str(err))
-    except:
-        msg = resp.text[:500]
-    if "overloaded" in msg.lower() or resp.status_code == 503:
-        st.error("Model overloaded (503). Wait 60s and retry.")
+file_changed = uploaded_file.name != st.session_state.last_file_name or mode != st.session_state.last_mode
+
+col_a, col_b = st.columns([1,3])
+with col_a:
+    analyze_clicked = st.button("Analyze", type="primary", use_container_width=True)
+with col_b:
+    if file_changed:
+        st.caption(f"Ready: {uploaded_file.name} • {mode}")
     else:
+        st.caption(f"Analyzed: {uploaded_file.name} • {mode}")
+
+should_analyze = analyze_clicked or file_changed
+
+if should_analyze:
+    st.session_state.last_file_name = uploaded_file.name
+    st.session_state.last_mode = mode
+    st.session_state.analysis_result = None
+
+    with st.spinner("Waking up backend..."):
+        try:
+            requests.get("https://geoscience-doc-copilot.onrender.com/", timeout=10)
+        except:
+            pass
+
+    with st.spinner("Analyzing report..."):
+        try:
+            files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
+            data = {"model": model_param}
+            resp = requests.post(API_URL, files=files, data=data, timeout=180)
+        except requests.exceptions.ReadTimeout:
+            st.error("Backend timeout — Render free tier is waking up. Wait 30s and click Analyze again.")
+            st.stop()
+        except Exception as e:
+            st.error(f"Connection error: {e}")
+            st.stop()
+
+    if resp.status_code != 200:
+        try:
+            err = resp.json()
+            msg = err.get("detail", str(err))
+        except:
+            msg = resp.text[:500]
         st.error(f"Backend error {resp.status_code}: {msg}")
+        st.stop()
+
+    try:
+        st.session_state.analysis_result = resp.json()
+    except Exception as e:
+        st.error(f"Invalid response: {e}")
+        st.stop()
+
+# Use stored result
+result = st.session_state.analysis_result
+if not result:
     st.stop()
 
 try:
-    result = resp.json()
     a = result.get("analysis", {})
     
     if a.get("is_oil_gas_document") == False:
