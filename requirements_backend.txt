@@ -1,0 +1,12 @@
+# Backend & frontend requirements - Production
+
+python-multipart==0.0.9
+streamlit==1.35.0
+requests==2.31.0
+plotly==5.22.0
+reportlab==4.1.0
+fastapi==0.110.0
+uvicorn==0.29.0
+pymupdf==1.24.7
+google-genai
+python-dotenv
