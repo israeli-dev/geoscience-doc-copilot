@@ -1,5 +1,5 @@
 """
-PetroLens Executive v3.5 Production
+PetroLens Executive v3.5 Production - FIXED: Analyze only on button click
 """
 import streamlit as st
 import requests
@@ -12,9 +12,10 @@ from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.units import inch
 
-st.set_page_config(page_title="PetroLens Executive v3.5 Production", layout="wide", page_icon="🛢️")
+st.set_page_config(page_title="PetroLens Executive v3.5 Production", layout="wide", page_icon="🛢")
 
 API_URL = "https://geoscience-doc-copilot-1.onrender.com/api/upload-report"
+WAKEUP_URL = "https://geoscience-doc-copilot-1.onrender.com/"
 
 def calc_posg(probs_dict):
     p = 1.0
@@ -123,7 +124,6 @@ if uploaded_file is None:
 # Map mode to backend model parameter
 model_param = "pro" if mode == "Deep Analysis" else "flash"
 
-# Prevent auto re-trigger loop: only analyze when file changes or mode changes or explicit button
 if "last_file_name" not in st.session_state:
     st.session_state.last_file_name = ""
 if "last_mode" not in st.session_state:
@@ -131,18 +131,19 @@ if "last_mode" not in st.session_state:
 if "analysis_result" not in st.session_state:
     st.session_state.analysis_result = None
 
-file_changed = uploaded_file.name != st.session_state.last_file_name or mode != st.session_state.last_mode
+file_changed = uploaded_file.name!= st.session_state.last_file_name or mode!= st.session_state.last_mode
 
 col_a, col_b = st.columns([1,3])
 with col_a:
     analyze_clicked = st.button("Analyze", type="primary", use_container_width=True)
 with col_b:
     if file_changed:
-        st.caption(f"Ready: {uploaded_file.name} • {mode}")
+        st.caption(f"Ready: {uploaded_file.name} • {mode} — Click Analyze to start")
     else:
-        st.caption(f"Analyzed: {uploaded_file.name} • {mode}")
+        st.caption(f"Ready to re-analyze: {uploaded_file.name} • {mode}")
 
-should_analyze = analyze_clicked or file_changed
+# FIXED: Only analyze on button click, not on file change
+should_analyze = analyze_clicked
 
 if should_analyze:
     st.session_state.last_file_name = uploaded_file.name
@@ -151,15 +152,15 @@ if should_analyze:
 
     with st.spinner("Waking up backend..."):
         try:
-            requests.get("https://geoscience-doc-copilot.onrender.com/", timeout=10)
+            requests.get(WAKEUP_URL, timeout=10)
         except:
             pass
 
-    with st.spinner("Analyzing report..."):
+    with st.spinner(f"Analyzing report in {mode} mode..."):
         try:
             files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
             data = {"model": model_param}
-            resp = requests.post(API_URL, files=files, data=data, timeout=180)
+            resp = requests.post(API_URL, files=files, data=data, timeout=300)
         except requests.exceptions.ReadTimeout:
             st.error("Backend timeout — Render free tier is waking up. Wait 30s and click Analyze again.")
             st.stop()
@@ -167,7 +168,7 @@ if should_analyze:
             st.error(f"Connection error: {e}")
             st.stop()
 
-    if resp.status_code != 200:
+    if resp.status_code!= 200:
         try:
             err = resp.json()
             msg = err.get("detail", str(err))
@@ -185,11 +186,12 @@ if should_analyze:
 # Use stored result
 result = st.session_state.analysis_result
 if not result:
+    st.info("👆 Click **Analyze** to run the assessment.")
     st.stop()
 
 try:
     a = result.get("analysis", {})
-    
+
     if a.get("is_oil_gas_document") == False:
         st.error("Rejected - Not Oil & Gas Document")
         st.write(f"Detected: {a.get('document_type_detected', 'Unknown')}")
@@ -217,7 +219,7 @@ try:
             elements = normalize_elements(bd)
             breakdown = {k.lower(): v["prob"] for k,v in elements.items()}
             posg = a.get("posg") or calc_posg(breakdown)
-    
+
     for k in elements:
         elements[k]["score"] = int(min(100, max(0, elements[k].get("score", 0))))
         elements[k]["prob"] = float(min(0.99, max(0.05, elements[k].get("prob", 0.5))))
@@ -246,7 +248,7 @@ try:
     fig2.add_hline(y=70, line_dash="dash", line_color="#22c55e", annotation_text="Threshold 70")
     fig2.update_layout(yaxis=dict(range=[0,105], title="Confidence /100"), height=380, bargap=0.6, showlegend=False)
     st.plotly_chart(fig2, use_container_width=True)
-    
+
     with st.expander("Component Details"):
         for k,v in elements.items():
             st.write(f"**{k}** ({v['score']}/100, P={v['prob']:.2f}): {v.get('comment','')}")
@@ -261,10 +263,10 @@ try:
         st.markdown(f"- **Dominant Fluid:** {fluid.get('dominant_fluid', a.get('dominant_fluid','-'))}\n- **Oil Quality:** {fluid.get('oil_quality','-')}\n- **Gas Quality:** {fluid.get('gas_quality','-')}\n- **Pressure:** {a.get('formation_pressure','-')} ({a.get('pressure_gradient','-')})")
     with c2:
         st.markdown(f"- **STOIIP:** {vol.get('stoiip', a.get('stoiip','-'))}\n- **Recoverable Oil:** {vol.get('recoverable_oil', a.get('recoverable_oil','-'))}\n- **Initial Rate:** {prod.get('initial_rate', a.get('initial_rate','-'))}\n- **Field Life / Plateau:** {prod.get('field_life','-')} / {prod.get('plateau','-')}")
-    
+
     st.subheader("Executive Summary")
     st.write(a.get('executive_summary','No summary available'))
-    
+
     st.subheader("Risk Factors")
     risks = a.get('risk_factors', [])
     if risks:
