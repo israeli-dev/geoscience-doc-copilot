@@ -14,7 +14,7 @@ from reportlab.lib.units import inch
 
 st.set_page_config(page_title="PetroLens Executive v3.5 Production", layout="wide", page_icon="🛢️")
 
-API_URL = "https://geoscience-doc-copilot.onrender.com/api/upload-report"
+API_URL = "https://geoscience-doc-copilot-1.onrender.com/api/upload-report"
 
 def calc_posg(probs_dict):
     p = 1.0
