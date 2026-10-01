@@ -42,8 +42,52 @@ Most AI PDF tools summarize. They don't *evaluate*.
 ### Architecture
 `PDF -> Streamlit (8501) -> FastAPI (8001) -> PyMuPDF (388k chars) -> Gemini 3 -> JSON -> Gauge`
 
+
+**Keep-Alive:** UptimeRobot pings both frontend and backend every 5 min to prevent sleep.
+
+### Tech Stack
+
+- **Frontend:** Streamlit, Plotly Graph Objects, ReportLab
+- **Backend:** FastAPI, Uvicorn, Docker, Pydantic
+- **AI:** Google Gemini 3 Flash / Pro
+- **Infra:** Render (Backend), Streamlit Cloud (Frontend), UptimeRobot
+- **State:** `st.session_state` — analyzes ONLY on "Analyze" button click (0 auto-retries = saves quota)
+
+### Key Features (v3.5)
+
+- Click-to-analyze (no auto-analysis on upload)
+- Model param preserved: `{"model": "flash" | "pro"}`
+- No auto-retry on analysis (saves Gemini quota)
+- Wakeup ping separate from analysis
+- Public app — works on mobile (Chrome/Safari)
+
+### How to Run Locally
+
+```bash
+git clone https://github.com/israeli-dev/geoscience-doc-copilot.git
+cd geoscience-doc-copilot
+
+python -m venv venv
+.\venv\Scripts\Activate.ps1 # Windows
+# source venv/bin/activate # Mac/Linux
+
+pip install -r requirements.txt
+pip install -r requirements_backend.txt
+
+# Create.env
+echo GEMINI_API_KEY=your_key_here >.env
+
+# Terminal 1 - Backend
+uvicorn main:app --host 0.0.0.0 --port 8001
+
+# Terminal 2 - Frontend
+streamlit run frontend/streamlit_app.py --server.port 8501
+
+
+
 ### Key Features
-- Petroleum-only prompt (Niger Delta, Agbada/Akata, wrench fault blocks)
+- Classified a doc file right from import to filter out non-petroleum doc and reject them immideately
+- Petroleum-only system prompt (Extract every key features and analyse them against risk or successs chance)
 - Dual Model: flash for speed, pro for depth
 - Strict JSON + regex fallback
 - Full-stack FastAPI + Streamlit
@@ -71,10 +115,6 @@ streamlit run frontend/streamlit_app.py --server.port 8501
   "executive_summary": "Proven but under-explored petroleum system with Espoir field analog. Billion-barrel potential."
 }
 
-
-Why Petroleum-Specialized?
-Generic RAG = commodity. Specialist = hireable.
-Tested 72 vs 12 proves prompt engineering, not summarization.
 
 Roadmap
 v1: Petroleum Specialist (current)
